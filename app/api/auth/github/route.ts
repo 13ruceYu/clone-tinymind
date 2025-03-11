@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     // Initial OAuth request
     const params = new URLSearchParams({
       client_id: GITHUB_CLIENT_ID,
-      scope: "read:user user:email",
+      scope: "read:user user:email public_repo workflow", // Added 'repo' scope
     });
 
     return Response.redirect(
@@ -46,9 +46,20 @@ export async function GET(request: NextRequest) {
     });
 
     const userData = await userResponse.json();
-    (await cookies()).set('username', userData.login, {
+    const cookieStore = await cookies();
+    
+    // Set username cookie
+    cookieStore.set('username', userData.login, {
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/',
+    });
+    
+    // Set access token cookie
+    cookieStore.set('gh_token', accessToken, {
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+      httpOnly: true, // For security
+      secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
     });
 
     // Create response with redirect and cookie
