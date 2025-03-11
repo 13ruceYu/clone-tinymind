@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Check if repository exists first
     const repoResponse = await fetch(
-      `https://api.github.com/repos/${username}/tinymind-blog`,
+      `https://api.github.com/repos/${username}/new-tinymind`,
       {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: 'tinymind-blog',
+          name: 'new-tinymind',
           description: 'My thoughts repository',
           auto_init: true
         })
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     // Get the current thoughts.json file from GitHub
     const thoughtsResponse = await fetch(
-      `https://api.github.com/repos/${username}/tinymind-blog/contents/content/thoughts.json`,
+      `https://api.github.com/repos/${username}/new-tinymind/contents/content/thoughts.json`,
       {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     // Update the file on GitHub
     const updateResponse = await fetch(
-      `https://api.github.com/repos/${username}/tinymind-blog/contents/content/thoughts.json`,
+      `https://api.github.com/repos/${username}/new-tinymind/contents/content/thoughts.json`,
       {
         method: 'PUT',
         headers: {
@@ -132,7 +132,7 @@ async function createNewThoughtsFile(username: string, thoughts: any[]) {
   const token = (await cookies()).get('gh_token')?.value;
 
   const response = await fetch(
-    `https://api.github.com/repos/${username}/tinymind-blog/contents/content/thoughts.json`,
+    `https://api.github.com/repos/${username}/new-tinymind/contents/content/thoughts.json`,
     {
       method: 'PUT',
       headers: {
@@ -148,6 +148,7 @@ async function createNewThoughtsFile(username: string, thoughts: any[]) {
   );
 
   if (!response.ok) {
+    console.log(response)
     throw new Error(`Failed to create thoughts.json: ${response.statusText}`);
   }
 

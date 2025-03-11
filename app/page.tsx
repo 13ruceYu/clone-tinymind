@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 
 async function fetchThoughts(username: string, token: string) {
   const response = await fetch(
-    `https://api.github.com/repos/${username}/tinymind-blog/contents/content/thoughts.json`,
+    `https://api.github.com/repos/${username}/new-tinymind/contents/content/thoughts.json`,
     {
       headers: {
         'Accept': 'application/vnd.github.v3+json',

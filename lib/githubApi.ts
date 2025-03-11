@@ -34,7 +34,7 @@ async function getRepoInfo(accessToken: string | undefined) {
     const { data: user } = await octokit.users.getAuthenticated();
     return {
       owner: user.login,
-      repo: 'tinymind-blog', // You might want to make this configurable
+      repo: 'new-tinymind', // You might want to make this configurable
     };
   } catch (error) {
     console.error('Error getting authenticated user:', error);
@@ -45,13 +45,13 @@ async function getRepoInfo(accessToken: string | undefined) {
 async function ensureRepoExists(octokit: Octokit, owner: string, repo: string) {
   try {
     const { data: repoData } = await octokit.repos.get({ owner, repo });
-    
+
     // Check if the repository description is empty.
     if (!repoData.description) {
       // Get the authenticated user's login
       const { data: userData } = await octokit.users.getAuthenticated();
       const userLogin = userData.login;
-      
+
       // Update the repository with the new description
       await octokit.repos.update({
         owner,
@@ -79,7 +79,7 @@ async function ensureRepoExists(octokit: Octokit, owner: string, repo: string) {
     if ('content' in readmeContent) {
       const decodedContent = Buffer.from(readmeContent.content, 'base64').toString('utf-8');
       console.log('README Decoded content:', decodedContent.trim());
-      if (decodedContent.trim() === '' || decodedContent.trim() === '# tinymind-blog') {
+      if (decodedContent.trim() === '' || decodedContent.trim() === '# new-tinymind') {
         // README.md is empty or contains only the default repo name, update it
         await octokit.repos.createOrUpdateFileContents({
           owner,
@@ -159,7 +159,7 @@ async function initializeGitHubStructure(octokit: Octokit, owner: string, repo: 
 export async function getBlogPosts(accessToken: string): Promise<BlogPost[]> {
   const octokit = getOctokit(accessToken);
   const { owner, repo } = await getRepoInfo(accessToken);
-  
+
   try {
     const response = await octokit.repos.getContent({
       owner,
@@ -685,7 +685,7 @@ export async function uploadImage(
       const username = parts[3];
       const repo = parts[4];
       const path = parts.slice(6).join('/');
-      
+
       return `https://github.com/${username}/${repo}/blob/${defaultBranch}/${path}?raw=true`;
     }
 
@@ -812,11 +812,11 @@ export async function getIconUrls(usernameOrAccessToken: string): Promise<{ icon
       console.error('Error getting authenticated user:', error);
       // Fallback to using the access token as a username
       owner = usernameOrAccessToken;
-      repo = 'tinymind-blog'; // Default repo name
+      repo = 'new-tinymind'; // Default repo name
     }
   } else {
     owner = usernameOrAccessToken;
-    repo = 'tinymind-blog'; // Default repo name
+    repo = 'new-tinymind'; // Default repo name
   }
 
   const defaultIconPath = `https://github.com/${owner}.png`;
