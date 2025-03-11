@@ -1,4 +1,5 @@
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
+import { cookies } from 'next/headers';
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_SECRET!;
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Exchange code for access token
-    const response = await fetch("https://github.com/login/oauth/access_token", {
+    const res = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       }),
     });
 
-    const data = await response.json();
+    const data = await res.json();
     const accessToken = data.access_token;
 
     // Get user data
@@ -45,14 +46,17 @@ export async function GET(request: NextRequest) {
     });
 
     const userData = await userResponse.json();
+    (await cookies()).set('username', userData.login, {
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    });
 
-    // Here you can:
-    // 1. Create or update user in your database
-    // 2. Set session/cookies
-    // 3. Redirect to your frontend with user data
+    // Create response with redirect and cookie
+    const response = Response.redirect(new URL('/', request.url));
 
-    return Response.json({ success: true, user: userData });
+    return response;
   } catch (error) {
+    console.log(error)
     return Response.json({ error: "Authentication failed" }, { status: 500 });
   }
 }
