@@ -1,0 +1,1 @@
+export const REPO_NAME = process.env.GITHUB_REPO_NAME || 'new-tinymind';

@@ -1,24 +1,29 @@
 import { cookies } from 'next/headers'
+import { Octokit } from '@octokit/rest'
+import { REPO_NAME } from '@/lib/constants';
+import { Thought } from '@/lib/types'
+import { checkAndInitRepository } from '@/lib/github';
 
 async function fetchThoughts(username: string, token: string) {
-  const response = await fetch(
-    `https://api.github.com/repos/${username}/new-tinymind/contents/content/thoughts.json`,
-    {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'Authorization': `Bearer ${token}`
-      }
+  const octokit = new Octokit({ auth: token });
+  await checkAndInitRepository(username, token)
+
+  try {
+    const { data } = await octokit.repos.getContent({
+      owner: username,
+      repo: REPO_NAME,
+      path: 'content/thoughts.json'
+    });
+
+    if ('content' in data) {
+      const content = Buffer.from(data.content, 'base64').toString('utf-8');
+      return JSON.parse(content);
     }
-  );
-
-  if (!response.ok) {
-    if (response.status === 404) return [];
-    throw new Error('Failed to fetch thoughts');
+    return [];
+  } catch (error) {
+    if ((error as { status?: number }).status === 404) return [];
+    throw error;
   }
-
-  const data = await response.json();
-  const content = Buffer.from(data.content, 'base64').toString('utf-8');
-  return JSON.parse(content);
 }
 
 export default async function Home() {
@@ -26,16 +31,18 @@ export default async function Home() {
   const redirectUrl = process.env.NEXT_PUBLIC_BASE_URL + '/api/auth/github'
   const ghOAuthLink = `https://github.com/login/oauth/authorize?client_id=${clientID}&redirect_uri=${redirectUrl}&scope=read:user,user:email,public_repo,workflow`
   const cookieStore = await cookies()
-
   const username = cookieStore.get('username')?.value
   const token = cookieStore.get('gh_token')?.value
   
-  let thoughts = [];
+  let thoughts: Thought[] = [];
+  let error: string | null = null;
+
   if (username && token) {
     try {
       thoughts = await fetchThoughts(username, token);
-    } catch (error) {
-      console.error('Error fetching thoughts:', error);
+    } catch (err) {
+      console.error('Error fetching thoughts:', err);
+      error = 'Failed to load thoughts. Please try again later.';
     }
   }
 
@@ -81,11 +88,17 @@ export default async function Home() {
             </button>
           </form>
 
+          {error && (
+            <div className="text-red-600 p-3 border border-red-200 rounded bg-red-50">
+              {error}
+            </div>
+          )}
+
           {thoughts.length > 0 && (
             <div className="space-y-4">
               <h2 className="font-bold">Your Thoughts</h2>
               <div className="space-y-3">
-                {thoughts.map((thought: any) => (
+                {thoughts.map((thought: Thought) => (
                   <div key={thought.id} className="border rounded p-3">
                     <p className="text-sm text-gray-600">
                       {new Date(thought.date).toLocaleDateString()}

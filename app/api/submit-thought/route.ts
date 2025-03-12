@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { Octokit } from '@octokit/rest';
+import { REPO_NAME } from '@/lib/constants';
+import { Thought } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,99 +27,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const octokit = new Octokit({ auth: token });
+    const repo = REPO_NAME;
+
     // Create a new thought object
-    const newThought = {
+    const newThought: Thought = {
       id: Date.now().toString(),
       content,
       date: new Date().toISOString(),
       author: username
     };
 
-    // Check if repository exists first
-    const repoResponse = await fetch(
-      `https://api.github.com/repos/${username}/new-tinymind`,
-      {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'Authorization': `Bearer ${token}`
-        }
-      }
-    );
+    let thoughts: Thought[] = [newThought];
+    let sha: string | undefined;
 
-    if (!repoResponse.ok) {
-      // Create repository if it doesn't exist
-      await fetch('https://api.github.com/user/repos', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: 'new-tinymind',
-          description: 'My thoughts repository',
-          auto_init: true
-        })
+    try {
+      // Try to get existing thoughts.json
+      const { data } = await octokit.repos.getContent({
+        owner: username,
+        repo,
+        path: 'content/thoughts.json',
+      });
+
+      if ('content' in data && 'sha' in data) {
+        const content = Buffer.from(data.content, 'base64').toString('utf-8');
+        thoughts = JSON.parse(content);
+        thoughts.unshift(newThought);
+        sha = data.sha;
+      }
+    } catch (error) {
+      // File doesn't exist, will create new one
+      await octokit.repos.createOrUpdateFileContents({
+        owner: username,
+        repo,
+        path: 'content/thoughts.json',
+        message: 'Create thoughts.json',
+        content: Buffer.from(JSON.stringify([newThought], null, 2)).toString('base64'),
+      });
+
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    // Update existing file
+    if (sha) {
+      await octokit.repos.createOrUpdateFileContents({
+        owner: username,
+        repo,
+        path: 'content/thoughts.json',
+        message: 'Add new thought',
+        content: Buffer.from(JSON.stringify(thoughts, null, 2)).toString('base64'),
+        sha,
       });
     }
 
-    // Get the current thoughts.json file from GitHub
-    const thoughtsResponse = await fetch(
-      `https://api.github.com/repos/${username}/new-tinymind/contents/content/thoughts.json`,
-      {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'Authorization': `Bearer ${token}`
-        }
-      }
-    );
-
-    if (!thoughtsResponse.ok) {
-      // If file doesn't exist, create it
-      if (thoughtsResponse.status === 404) {
-        await createNewThoughtsFile(username, [newThought]);
-        return NextResponse.redirect(new URL('/', request.url));
-      }
-
-      throw new Error(`Failed to fetch thoughts.json: ${thoughtsResponse.statusText}`);
-    }
-
-    const thoughtsData = await thoughtsResponse.json();
-    const content64 = thoughtsData.content;
-    const sha = thoughtsData.sha;
-
-    // Decode the base64 content
-    const decodedContent = Buffer.from(content64, 'base64').toString('utf-8');
-    let thoughts = JSON.parse(decodedContent);
-
-    // Add the new thought
-    thoughts.unshift(newThought);
-
-    // Update the file on GitHub
-    const updateResponse = await fetch(
-      `https://api.github.com/repos/${username}/new-tinymind/contents/content/thoughts.json`,
-      {
-        method: 'PUT',
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: 'Add new thought',
-          content: Buffer.from(JSON.stringify(thoughts, null, 2)).toString('base64'),
-          sha
-        })
-      }
-    );
-
-    if (!updateResponse.ok) {
-      const errorData = await updateResponse.json();
-      console.error('GitHub API Error:', errorData);
-      throw new Error(`Failed to update thoughts.json: ${updateResponse.statusText}`);
-    }
-
-    // Redirect back to the homepage
     return NextResponse.redirect(new URL('/', request.url));
 
   } catch (error) {
@@ -126,31 +89,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function createNewThoughtsFile(username: string, thoughts: any[]) {
-  const token = (await cookies()).get('gh_token')?.value;
-
-  const response = await fetch(
-    `https://api.github.com/repos/${username}/new-tinymind/contents/content/thoughts.json`,
-    {
-      method: 'PUT',
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: 'Create thoughts.json',
-        content: Buffer.from(JSON.stringify(thoughts, null, 2)).toString('base64')
-      })
-    }
-  );
-
-  if (!response.ok) {
-    console.log(response)
-    throw new Error(`Failed to create thoughts.json: ${response.statusText}`);
-  }
-
-  return response.json();
 }
